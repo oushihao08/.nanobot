@@ -1,0 +1,13 @@
+# 敏感配置文件（含 API Keys）
+config.json
+
+# 临时/缓存文件
+media/
+history/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+
+# 会话数据（可选：如果你想同步记忆，删除这行）
+# sessions/
