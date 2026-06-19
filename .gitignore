@@ -1,5 +1,4 @@
-# 敏感配置文件（含 API Keys）
-config.json
+
 
 # 临时/缓存文件
 media/
@@ -9,6 +8,17 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+.DS_Store
 
-# 会话数据（可选：如果你想同步记忆，删除这行）
-# sessions/
+# 根级运行产物
+sessions/
+sessions/*.jsonl
+logs/
+backups/
+
+# workspace 运行产物
+workspace/sessions/
+workspace/sessions/*.jsonl
+workspace/tmp_outputs/
+workspace/sync/
+workspace/sync/backups/
