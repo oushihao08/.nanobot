@@ -1,0 +1,40 @@
+{
+  "agentId": "lvgou-test-agent",
+  "sourceRoot": "/Users/jack/Documents/codes/lvgou/.opencode",
+  "targetWorkspace": "/Users/jack/.nanobot/workspace",
+  "syncedAt": "2026-06-16T00:31:20+0800",
+  "hash": "sha256:961807312e19d323f8f3b785b61acee11ce696adbc0fd2d878d4a815ff142191",
+  "fileCount": 48,
+  "enabledSkills": [
+    "lvgou-test-agent",
+    "lvgou-rules",
+    "lvgou-gbrain",
+    "lvgou-testing",
+    "lvgou-agent-map",
+    "lvgou-quick-lookup",
+    "at-read",
+    "at-fail",
+    "at-contract"
+  ],
+  "referenceOnlySkills": [
+    "at-run",
+    "at-automate",
+    "at-derive",
+    "at-manifest"
+  ],
+  "agentIdentity": {
+    "botName": "lvgou-test-agent",
+    "soul": "SOUL.md",
+    "runtimeInstructions": "AGENTS.md",
+    "canonicalSource": "skills/lvgou-test-agent/references/lvgou-test-agent.md"
+  },
+  "skipped": [
+    "node_modules",
+    ".git",
+    "testing/playwright-report",
+    "testing/test-results",
+    "testing/artifacts full sync",
+    "testing/evidence full sync"
+  ],
+  "status": "success"
+}

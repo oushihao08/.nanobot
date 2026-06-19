@@ -1,0 +1,5 @@
+{"_type": "metadata", "key": "cli:deepseek-check", "created_at": "2026-06-18T17:07:27.300639", "updated_at": "2026-06-18T17:07:32.195306", "metadata": {}, "last_consolidated": 0}
+{"role": "user", "content": "只回答当前实际使用的模型名称，不要从历史记忆猜。", "timestamp": "2026-06-18T17:07:27.319754"}
+{"role": "assistant", "content": "", "tool_calls": [{"id": "call_00_QZ5uPoVBYHe3JJjq7ke56270", "type": "function", "function": {"name": "my", "arguments": "{\"action\": \"check\", \"key\": \"model\"}"}}], "reasoning_content": "The user is asking me to only answer with the actual model name currently being used, and not to guess from historical memory. Let me check my current configuration using the `my` tool.", "timestamp": "2026-06-18T17:07:32.195270"}
+{"role": "tool", "tool_call_id": "call_00_QZ5uPoVBYHe3JJjq7ke56270", "name": "my", "content": "model: 'deepseek-v4-pro'", "timestamp": "2026-06-18T17:07:32.195298"}
+{"role": "assistant", "content": "deepseek-v4-pro", "reasoning_content": "The current model is 'deepseek-v4-pro'.", "timestamp": "2026-06-18T17:07:32.195302", "latency_ms": 4894}

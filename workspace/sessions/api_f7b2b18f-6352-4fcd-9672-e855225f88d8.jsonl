@@ -1,0 +1,2 @@
+{"_type": "metadata", "key": "api:f7b2b18f-6352-4fcd-9672-e855225f88d8", "created_at": "2026-06-18T22:56:17.926477", "updated_at": "2026-06-18T22:56:17.948554", "metadata": {"pending_user_turn": true}, "last_consolidated": 0}
+{"role": "user", "content": "帮我识别图片里的文字：/Users/jack/Documents/微信图片_20260421133806_1047_6.png", "timestamp": "2026-06-18T22:56:17.948548"}

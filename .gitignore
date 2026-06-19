@@ -4,6 +4,7 @@ config.json
 # 临时/缓存文件
 media/
 history/
+tmp_outputs/
 __pycache__/
 *.pyc
 *.pyo

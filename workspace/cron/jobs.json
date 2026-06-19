@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "d5e67e10",
+      "name": "\u6c47\u62a5\u5c0f\u7ea2\u4e66\u53d8\u73b0\u65b9\u6cd5\u7814\u7a76\u8fdb\u5ea6",
+      "enabled": true,
+      "schedule": {
+        "kind": "every",
+        "atMs": null,
+        "everyMs": 1200000,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "\u6c47\u62a5\u5c0f\u7ea2\u4e66\u53d8\u73b0\u65b9\u6cd5\u7814\u7a76\u8fdb\u5ea6",
+        "deliver": true,
+        "channel": "telegram",
+        "to": "5304222154"
+      },
+      "state": {
+        "nextRunAtMs": 1772019889648,
+        "lastRunAtMs": 1772018667774,
+        "lastStatus": "ok",
+        "lastError": null
+      },
+      "createdAtMs": 1772011878189,
+      "updatedAtMs": 1772018689648,
+      "deleteAfterRun": false
+    }
+  ]
+}
