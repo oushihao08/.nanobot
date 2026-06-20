@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
+import hashlib
 import os
 import re
+import shutil
 import sys
-import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 try:
     import fitz
@@ -43,6 +49,66 @@ def default_config_path():
 
 def default_workdir():
     return os.environ.get("QWEN_OCR_WORKDIR", "~/.nanobot/workspace/tmp_outputs/qwen-ocr-pdf")
+
+
+def is_remote_url(value):
+    return re.match(r"^https?://", value or "", re.IGNORECASE) is not None
+
+
+def safe_name(value, fallback="document"):
+    stem = os.path.splitext(os.path.basename(value))[0]
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-._")
+    return cleaned[:80] or fallback
+
+
+def safe_remote_pdf_name(url):
+    parsed = urllib.parse.urlparse(url)
+    path_name = os.path.basename(parsed.path) or "remote.pdf"
+    stem, ext = os.path.splitext(path_name)
+    if ext.lower() != ".pdf":
+        ext = ".pdf"
+    url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
+    return f"{safe_name(stem, 'remote-pdf')}-{url_hash}{ext}"
+
+
+def download_remote_pdf(url, workdir):
+    input_dir = os.path.join(workdir, "inputs")
+    os.makedirs(input_dir, exist_ok=True)
+    output_path = os.path.join(input_dir, safe_remote_pdf_name(url))
+    request = urllib.request.Request(url, headers={"User-Agent": "nanobot-qwen-ocr/1.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            with open(output_path, "wb") as file:
+                shutil.copyfileobj(response, file)
+    except urllib.error.URLError as error:
+        fail(f"Failed to download PDF URL: {error}")
+    return output_path
+
+
+def short_file_hash(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()[:12]
+
+
+def create_run_dir(workdir, pdf_path):
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    pdf_key = f"{safe_name(pdf_path)}-{short_file_hash(pdf_path)}"
+    run_dir = os.path.join(workdir, "runs", f"{pdf_key}-{timestamp}-{os.getpid()}")
+    os.makedirs(run_dir, exist_ok=True)
+    return run_dir
+
+
+def make_logger(log_path):
+    def log(message):
+        line = f"{datetime.datetime.now().isoformat(timespec='seconds')} {message}"
+        print(line, file=sys.stderr, flush=True)
+        with open(log_path, "a", encoding="utf-8") as file:
+            file.write(line + "\n")
+
+    return log
 
 
 def page_range(value, page_count):
@@ -279,10 +345,15 @@ def main():
     )
     args = parser.parse_args()
 
-    pdf_path = os.path.abspath(os.path.expanduser(args.pdf))
     output_path = os.path.abspath(os.path.expanduser(args.output))
     config_path = os.path.abspath(os.path.expanduser(args.config))
     workdir = os.path.abspath(os.path.expanduser(args.workdir))
+    os.makedirs(workdir, exist_ok=True)
+
+    if is_remote_url(args.pdf):
+        pdf_path = download_remote_pdf(args.pdf, workdir)
+    else:
+        pdf_path = os.path.abspath(os.path.expanduser(args.pdf))
 
     if not os.path.exists(pdf_path):
         fail(f"PDF not found: {pdf_path}")
@@ -294,28 +365,41 @@ def main():
     model_candidates = configured_model_candidates(config)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    os.makedirs(workdir, exist_ok=True)
 
     pdf, page_count = get_page_count(pdf_path)
     selected_pages = page_range(args.pages, page_count)
     failures = []
     page_results = []
 
-    image_root_context = tempfile.TemporaryDirectory(prefix="pages_", dir=workdir)
-    image_root = image_root_context.name
+    run_dir = create_run_dir(workdir, pdf_path)
+    log_path = os.path.join(run_dir, "progress.log")
+    log = make_logger(log_path)
+    image_root = os.path.join(run_dir, "images")
+    os.makedirs(image_root, exist_ok=True)
+
+    log(f"run_dir={run_dir}")
+    log(f"pdf={pdf_path}")
+    log(f"output={output_path}")
+    log(f"pages={len(selected_pages)}/{page_count}")
+    log(f"dpi={args.dpi} preprocess={args.preprocess}")
 
     try:
         for page_index in selected_pages:
             page_no = page_index + 1
+            page_started_at = time.monotonic()
             try:
+                log(f"page {page_no}/{page_count} render start")
                 if pdf is not None:
                     image_path = render_page_with_fitz(pdf, page_index, image_root, args.dpi)
                 else:
                     image_path = render_page_with_pdf2image(pdf_path, page_index, image_root, args.dpi)
+                log(f"page {page_no}/{page_count} render ok image={image_path}")
                 if args.preprocess == "auto":
+                    log(f"page {page_no}/{page_count} ocr start")
                     text, usage, model_name = call_qwen_ocr(api_key, api_base, image_path, args.prompt, model_candidates)
                     original_low_info = is_low_information_text(text)
                     if watermark_noise_score(text) >= 8 or original_low_info:
+                        log(f"page {page_no}/{page_count} watermark retry start")
                         retry_image_path = preprocess_image_for_ocr(image_path, "watermark")
                         retry_text, retry_usage, retry_model_name = call_qwen_ocr(
                             api_key, api_base, retry_image_path, args.prompt, model_candidates
@@ -327,34 +411,41 @@ def main():
                         ):
                             text, usage, model_name = retry_text, retry_usage, retry_model_name
                         else:
-                            print(f"page {page_no}: watermark retry discarded due to lower information", file=sys.stderr)
+                            log(f"page {page_no}/{page_count} watermark retry discarded due to lower information")
                 else:
+                    log(f"page {page_no}/{page_count} preprocess start mode={args.preprocess}")
                     image_path = preprocess_image_for_ocr(image_path, args.preprocess)
+                    log(f"page {page_no}/{page_count} ocr start image={image_path}")
                     text, usage, model_name = call_qwen_ocr(api_key, api_base, image_path, args.prompt, model_candidates)
                 cleaned = text.strip() if args.no_clean_watermarks else clean_watermark_lines(text)
                 page_results.append(f"\n\n===== 第 {page_no} 页 =====\n\n{cleaned}\n")
                 usage_text = f" usage={usage}" if usage else ""
-                print(f"page {page_no}/{page_count} ok model={model_name}{usage_text}", file=sys.stderr)
+                elapsed = time.monotonic() - page_started_at
+                log(f"page {page_no}/{page_count} ok elapsed={elapsed:.1f}s model={model_name}{usage_text}")
             except Exception as error:
                 failures.append((page_no, str(error)))
-                print(f"page {page_no}/{page_count} failed: {error}", file=sys.stderr)
+                elapsed = time.monotonic() - page_started_at
+                log(f"page {page_no}/{page_count} failed elapsed={elapsed:.1f}s error={error}")
 
         with open(output_path, "w", encoding="utf-8") as file:
             file.write("\n".join(page_results).strip())
             file.write("\n")
 
         print(output_path)
+        log(f"output_written={output_path}")
         if failures:
-            print("failed_pages=" + ",".join(str(page) for page, _ in failures), file=sys.stderr)
+            log("failed_pages=" + ",".join(str(page) for page, _ in failures))
             for page, error in failures:
-                print(f"page {page}: {error}", file=sys.stderr)
+                log(f"page {page}: {error}")
     finally:
         if pdf is not None:
             pdf.close()
         if args.keep_images:
-            print(f"images={image_root}", file=sys.stderr)
+            log(f"images_kept={image_root}")
         else:
-            image_root_context.cleanup()
+            shutil.rmtree(image_root, ignore_errors=True)
+            log(f"images_removed={image_root}")
+        log(f"log={log_path}")
 
 
 if __name__ == "__main__":

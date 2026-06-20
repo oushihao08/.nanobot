@@ -92,6 +92,54 @@ python3 scripts/qwen_ocr_pdf.py \
   --output "/absolute/path/to/result.txt"
 ```
 
+Remote PDF URL is also allowed. The script downloads it into the controlled `inputs/` directory first:
+
+```bash
+python3 scripts/qwen_ocr_pdf.py \
+  --config ~/.nanobot/config.json \
+  --pdf "https://example.com/input.pdf" \
+  --output "/absolute/path/to/result.txt"
+```
+
+## Runtime Files
+
+PDF OCR uses one controlled runtime root:
+
+```text
+~/.nanobot/workspace/tmp_outputs/qwen-ocr-pdf/runs/
+```
+
+Remote PDF inputs are stored under:
+
+```text
+~/.nanobot/workspace/tmp_outputs/qwen-ocr-pdf/inputs/
+```
+
+Each PDF task creates one run directory:
+
+```text
+<pdf-safe-name>-<pdf-sha256-12>-<YYYYMMDD-HHMMSS>-<pid>/
+```
+
+Contents:
+
+- `progress.log`: page-by-page progress and timing log.
+- `images/`: rendered page images and preprocessed images while the task is running.
+
+Ordering rule:
+
+- Final PDF OCR text must always be written in ascending PDF page order: page 1, page 2, page 3, and so on.
+- If page processing becomes concurrent in the future, concurrency may only affect execution; final merge/output must still follow ascending page order.
+- Never write pages in completion order.
+
+Cleanup rule:
+
+- Default behavior removes `images/` after the task finishes.
+- Keep `progress.log`; it is small and is the authoritative source for debugging slow or failed PDF jobs.
+- Only pass `--keep-images` when the user explicitly asks to preserve intermediate images for debugging or quality comparison.
+- Do not create or keep extra OCR scratch files outside this runtime root.
+- Final user-requested output belongs at the requested output path, not inside `tmp_outputs`, unless the user did not specify an output path.
+
 If the user explicitly asks to remove watermarks, prefer:
 
 ```bash
@@ -122,9 +170,13 @@ python3 scripts/qwen_ocr_pdf.py \
 4. For image input, use `qwen_ocr.py` and keep the request shape aligned with the official `qwen3.5-ocr` example.
 5. For remote image URLs, pass the URL directly. For local images, convert them to a data URL and keep the rest of the request shape unchanged.
 6. For local PDF input, call `qwen_ocr_pdf.py`. It may render PDF pages to images, but OCR recognition must be done through `qwen3.5-ocr`.
-7. If the user says 不含水印, 去水印, remove watermark, or similar, pass `--preprocess auto`.
-8. For full PDF input, call `qwen_ocr_pdf.py` directly with the requested output path and wait for completion.
-9. If tempted to write a new OCR script, stop and use the approved script instead.
-10. If the approved script fails, report the error and do not create a replacement implementation.
-11. Return only the OCR result itself by default. If output path was explicitly requested and user needs confirmation, return result plus path; otherwise do not add explanation.
-12. For OCR tasks, do not call `read_file` on the target image just to inspect it manually unless the approved OCR script has already failed and the user explicitly asks for visual analysis instead of OCR.
+7. For remote PDF URL input, pass the URL directly to `qwen_ocr_pdf.py`; the script handles controlled download first.
+8. If the user says 不含水印, 去水印, remove watermark, or similar, pass `--preprocess auto`.
+9. For full PDF input, call `qwen_ocr_pdf.py` directly with the requested output path and wait for completion.
+10. If tempted to write a new OCR script, stop and use the approved script instead.
+11. If the approved script fails, report the error and do not create a replacement implementation.
+12. Return only the OCR result itself by default. If output path was explicitly requested and user needs confirmation, return result plus path; otherwise do not add explanation.
+13. For OCR tasks, do not call `read_file` on the target image just to inspect it manually unless the approved OCR script has already failed and the user explicitly asks for visual analysis instead of OCR.
+14. Treat `progress.log` as the authoritative progress source for long PDF OCR jobs.
+15. Do not keep intermediate page images after successful completion unless `--keep-images` was explicitly requested.
+16. Final PDF OCR output must always be ordered by ascending page number, even if future implementation uses concurrent page OCR.
